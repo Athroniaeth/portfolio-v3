@@ -1,6 +1,8 @@
 import json
 import pathlib
 import re
+import shutil
+import subprocess
 
 import msgspec
 import pytest
@@ -15,7 +17,7 @@ from litestar.status_codes import (
 )
 from litestar.testing import AsyncTestClient, RequestFactory
 
-from backend import CONTENT_EXPORT, FRONTEND_ROOT
+from backend import CONTENT_EXPORT, FRONTEND_ROOT, PROJECT_ROOT
 from backend.app import build_openapi_config, build_rate_limit_config
 from backend.content import CONTENT, Content, Sections, Text
 from backend.exceptions import NotFoundError, ProblemDetail, app_error_handler
@@ -354,3 +356,55 @@ def test_every_achievement_declares_what_kind_it_is():
     assert kinds <= renderable, kinds - renderable
     # Every kind the frontend can draw is used, so a stale icon cannot go unnoticed.
     assert kinds == renderable, renderable - kinds
+
+
+# Everything under these is hand-written and belongs in the repository.
+SOURCE_ROOTS = (
+    "backend",
+    "tests",
+    "deploy",
+    "scripts",
+    "frontend/src",
+    "frontend/scripts",
+)
+
+# The one exception, and it is deliberate: the API client is regenerated from
+# openapi.json during the Docker build, so committing it would be committing a
+# derivative of a file two directories away.
+IGNORED_ON_PURPOSE = ("frontend/src/generated/",)
+
+
+def test_no_source_file_is_hidden_from_git():
+    """A .gitignore pattern that swallows source is invisible until a clean clone.
+
+    The Python template's `lib/` matches a directory called lib at *any* depth, so it
+    silently excluded frontend/src/lib and with it every i18n, routing and content
+    helper the site is built from. Nothing caught it locally, because the files were
+    on disk and the build was happy; it surfaced as an unresolved import the first
+    time the image was built from a fresh checkout. The patterns are anchored to the
+    root now, and this is what keeps them anchored.
+    """
+    if shutil.which("git") is None or not (PROJECT_ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
+
+    listed = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+            "--",
+            *SOURCE_ROOTS,
+        ],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    hidden = [
+        path
+        for path in listed.stdout.splitlines()
+        if not path.startswith(IGNORED_ON_PURPOSE) and "__pycache__" not in path
+    ]
+    assert not hidden, "excluded from git by .gitignore: " + ", ".join(hidden)
