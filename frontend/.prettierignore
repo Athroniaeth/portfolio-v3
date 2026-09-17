@@ -1,3 +1,12 @@
+# Generated, all of it. Formatting a generated file means the generator and the
+# formatter take turns rewriting it, and `just check` fails on a diff that no one
+# introduced — content.json is written by `just content`, images.json by `just images`,
+# and src/generated/ by `just types`.
+src/data/
 src/generated/
+
+# Built or vendored, never edited here.
 public/
+dist/
+.ssr/
 pnpm-lock.yaml

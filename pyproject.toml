@@ -15,6 +15,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "commitizen>=4.18.0",
+    "fonttools[woff]>=4.56",
     "prek>=0.5.1",
     "pyrefly>=1.2.0",
     "pytest>=9.1.1",

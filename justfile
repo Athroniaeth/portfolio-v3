@@ -46,6 +46,26 @@ dev-front:
 types:
     ENABLE_DOCS=true uv run litestar assets generate-types
 
+# Run after editing backend/content.py, then commit the JSON alongside it.
+
+# Export the portfolio content to frontend/src/data/content.json.
+content:
+    uv run python -m backend.export
+
+# Both write into frontend/public/ and both are committed, so neither CI nor the
+# frontend image needs fonttools or sharp. Re-run after dropping a file in assets/.
+
+# Subset the fonts (1 008 KB of woff2 -> 44 KB).
+fonts:
+    uv run python scripts/optimize_fonts.py
+
+# Re-encode the images to the sizes the pages paint, in AVIF and WebP.
+images:
+    pnpm -C frontend run images
+
+# Rebuild every derived asset.
+assets: fonts images
+
 # Static checks, no writes: ruff + pyrefly (Python), eslint + prettier + svelte-check (frontend).
 lint:
     uv run ruff format --check .
@@ -67,9 +87,16 @@ format:
 test:
     uv run pytest
 
-# Build the production frontend bundle into frontend/dist (no Python needed).
+# Four steps, chained in frontend/package.json: the client bundle, the server bundle,
+# the prerender that writes one HTML document per route, and the gzip pass.
+
+# Build the production site into frontend/dist (no Python needed).
 build:
     pnpm -C frontend build
+
+# Serve frontend/dist exactly as nginx will, to check the built site.
+preview: build
+    pnpm -C frontend preview
 
 # The guard that replaces the build-time coupling between frontend and backend.
 
@@ -77,5 +104,13 @@ build:
 check-types: types
     git diff --exit-code openapi.json
 
-# Full gate before pushing (what CI runs): contract check + lint + tests.
-check: check-types lint test
+# Same guard for the content: backend/content.py is the source of truth, and the
+# frontend image builds from the exported JSON alone. An edit that was never exported
+# would deploy the old copy, silently.
+
+# Fail if content.json drifted from backend/content.py.
+check-content: content
+    git diff --exit-code frontend/src/data/content.json
+
+# Full gate before pushing (what CI runs): contracts + lint + tests.
+check: check-types check-content lint test

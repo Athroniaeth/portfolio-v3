@@ -1,0 +1,97 @@
+# Preview stack: the site on a throwaway subdomain, behind the Traefik that Coolify
+# already runs, without going through Coolify itself.
+#
+# What it is for: looking at the built site on a real domain, over real HTTPS, before
+# pointing pierrechaumont.fr at it. Deliberately separate from compose.prod.yml — that
+# file is Coolify's source of truth for the production deployment and must keep
+# describing production alone.
+#
+#   docker compose -p portfolio-v3-preview -f compose.preview.yml up -d --build
+#   docker compose -p portfolio-v3-preview -f compose.preview.yml down
+#
+# Two things to know before pointing anyone at the result:
+#
+#   - The pages carry <link rel="canonical"> and og:url pointing at pierrechaumont.fr,
+#     because that is what frontend/src/lib/site-url.ts declares. Rather than build a
+#     second time with a different host, the router below answers X-Robots-Tag:
+#     noindex, so a crawler that finds this subdomain leaves it alone instead of
+#     indexing a duplicate of the real site.
+#   - Analytics stays silent here. client.ts only initialises OpenPanel on the
+#     production hostname, and the instance would reject an event from this origin
+#     anyway — its CORS list is per project. That is the intended behaviour: a preview
+#     must not move the production figures.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    environment:
+      - API_KEY=${API_KEY:?}
+      - OPENPANEL_API_URL=${OPENPANEL_API_URL:-https://opapi.athroniaeth.cloud}
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      # `coolify` is where Traefik listens; `default` is what lets nginx reach `api`.
+      - coolify
+      - default
+    labels:
+      # The proxy runs with exposedbydefault=false, so a container is invisible to it
+      # until it says otherwise.
+      - traefik.enable=true
+      # Named explicitly because this service sits on two networks and Traefik would
+      # otherwise have to guess which address to route to.
+      - traefik.docker.network=coolify
+      - traefik.http.services.portfolio-v3.loadbalancer.server.port=8080
+
+      - traefik.http.routers.portfolio-v3-http.entryPoints=http
+      - traefik.http.routers.portfolio-v3-http.rule=Host(`${PREVIEW_DOMAIN:?}`)
+      - traefik.http.routers.portfolio-v3-http.middlewares=portfolio-v3-https
+
+      - traefik.http.routers.portfolio-v3-https.entryPoints=https
+      - traefik.http.routers.portfolio-v3-https.rule=Host(`${PREVIEW_DOMAIN:?}`)
+      - traefik.http.routers.portfolio-v3-https.tls=true
+      - traefik.http.routers.portfolio-v3-https.tls.certresolver=letsencrypt
+      - traefik.http.routers.portfolio-v3-https.middlewares=portfolio-v3-noindex
+
+      # Own middlewares rather than the `redirect-to-https` and `gzip` that other
+      # Coolify services declare: those exist only as long as some other container
+      # keeps declaring them, and borrowing one would make this stack break when an
+      # unrelated service is removed.
+      - traefik.http.middlewares.portfolio-v3-https.redirectscheme.scheme=https
+      - traefik.http.middlewares.portfolio-v3-noindex.headers.customresponseheaders.X-Robots-Tag=noindex,
+        nofollow
+
+      # No compression middleware on purpose: nginx serves the .gz written at build
+      # time via gzip_static. Letting Traefik compress as well would decompress and
+      # recompress every response to end up at the same size.
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      - WEB_CONCURRENCY=${WEB_CONCURRENCY:-1}
+      - ENABLE_DOCS=${ENABLE_DOCS:-false}
+      - API_KEY=${API_KEY:?}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/api/health")
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      # Not on `coolify`: the API has no domain and nothing outside this stack should
+      # reach it.
+      - default
+
+networks:
+  coolify:
+    external: true

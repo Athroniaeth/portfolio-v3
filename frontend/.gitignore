@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Server bundle for the prerenderer — built, never served, never committed.
+.ssr/
+
 # Vite
 *.local
 .vite/

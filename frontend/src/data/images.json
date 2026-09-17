@@ -1,0 +1,28 @@
+{
+  "cards": {
+    "width": 330,
+    "height": 110,
+    "widths": [
+      330,
+      660
+    ],
+    "position": "top",
+    "formats": [
+      "avif",
+      "webp"
+    ]
+  },
+  "avatar": {
+    "width": 40,
+    "height": 40,
+    "widths": [
+      40,
+      80
+    ],
+    "position": "centre",
+    "formats": [
+      "avif",
+      "webp"
+    ]
+  }
+}

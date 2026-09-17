@@ -8,6 +8,9 @@ services:
     # `:?` on purpose: a missing key must stop the deployment, not ship an open API.
     environment:
       API_KEY: ${API_KEY:?set API_KEY in .env (see .env.example)}
+      # Where nginx forwards /op/. Defaulted rather than required: the site works
+      # without analytics, it just stops counting.
+      OPENPANEL_API_URL: ${OPENPANEL_API_URL:-https://opapi.athroniaeth.cloud}
     ports:
       - "8000:8080"
     depends_on:

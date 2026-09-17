@@ -1,10 +1,11 @@
-# Single origin: nginx serves the Svelte bundle and proxies /api to Litestar. The
-# browser only ever sees one host, so no CORS and no API URL baked into the bundle.
-# Frontend and API remain two containers, sized independently.
+# Single origin: nginx serves the prerendered pages, proxies /api to Litestar and /op
+# to the OpenPanel instance. The browser only ever sees one host, so no CORS, no API
+# URL baked into the bundle, and no second TLS handshake for analytics.
 #
 # A template, not a plain conf: the nginx entrypoint runs envsubst over
-# /etc/nginx/templates at startup to inject ${API_KEY}. NGINX_ENVSUBST_FILTER limits
-# the substitution to that one name, so nginx's own $uri/$host survive untouched.
+# /etc/nginx/templates at startup to inject ${API_KEY} and ${OPENPANEL_API_URL}.
+# NGINX_ENVSUBST_FILTER limits the substitution to those names, so nginx's own
+# $uri/$host survive untouched.
 # Keep the protocol seen by the *browser*. Traefik terminates TLS and talks to this
 # container in plain HTTP, so $scheme is "http" here: forwarding it would tell the API
 # the visitor is not on HTTPS, which breaks Secure cookies and absolute redirects.
@@ -37,20 +38,43 @@ server {
     real_ip_recursive on;
     server_name _;
 
-    root /usr/share/nginx/html;
-    index index.html;
+    # Answer redirects with a relative Location. Building an absolute one is the
+    # default, and behind Traefik nginx would build it from what *it* sees — plain
+    # HTTP on port 8080 — so /about would send the visitor to
+    # http://host:8080/#about. A relative Location is resolved by the browser against
+    # the URL it actually asked for, which is the https one.
+    absolute_redirect off;
 
+    root /usr/share/nginx/html;
+
+    # Serve the .gz written at build time instead of compressing on every request.
+    # `gzip on` stays as the fallback for anything with no precompressed twin, but at
+    # level 1 and only for text — see frontend/scripts/compress.mjs.
+    gzip_static on;
     gzip on;
     gzip_vary on;
     gzip_min_length 1024;
     gzip_types text/plain text/css application/javascript application/json image/svg+xml;
 
-    # Vite hashe le nom de chaque asset, donc le contenu d'une URL ne change jamais.
+    # Vite hashes the name of every asset, so the content behind one of these URLs can
+    # never change.
     location /assets/ {
         include /etc/nginx/security-headers.conf;
 
         # One header only: adding `expires` would emit a second, duplicate one.
         add_header Cache-Control "public, max-age=31536000, immutable" always;
+        access_log off;
+        try_files $uri =404;
+    }
+
+    # Fonts and images are not hashed — they are written by `just fonts` and
+    # `just images` and referenced by a stable name — so they cannot claim to be
+    # immutable. A week is long enough that a repeat visitor re-fetches nothing, and
+    # short enough that replacing an image is visible without renaming it.
+    location ~ ^/(fonts|images|icons|vendor)/ {
+        include /etc/nginx/security-headers.conf;
+
+        add_header Cache-Control "public, max-age=604800" always;
         access_log off;
         try_files $uri =404;
     }
@@ -69,6 +93,45 @@ server {
         proxy_set_header X-Forwarded-Proto $forwarded_proto;
     }
 
+    # Analytics, proxied first-party.
+    #
+    # The page calls /op/track on its own origin and this block forwards it to the
+    # OpenPanel instance, so the browser never opens a second connection: no extra DNS
+    # lookup, TCP handshake or TLS negotiation for a few hundred bytes of telemetry,
+    # and the CSP below needs no third-party origin.
+    #
+    # `rewrite` strips the prefix, not a trailing slash on proxy_pass. The usual
+    # `proxy_pass https://host/;` idiom does not apply once the upstream is a variable:
+    # nginx then treats a URI in the directive as a *replacement* for the request URI
+    # rather than a prefix, so /op/track would arrive as / and the instance would
+    # answer "Route POST:/ not found".
+    #
+    # Origin and User-Agent are passed through untouched on purpose. The instance
+    # checks Origin against the project's allowed domains — rewriting it would make
+    # every event 401 — and reads User-Agent for device attribution.
+    location /op/ {
+        # The upstream is an external name, so it has to be resolved at request time.
+        # Without a resolver nginx resolves it once at startup and keeps the address
+        # forever, which breaks the day the instance moves.
+        resolver 127.0.0.11 1.1.1.1 valid=300s ipv6=off;
+        set $openpanel "${OPENPANEL_API_URL}";
+
+        rewrite ^/op/(.*)$ /$1 break;
+        proxy_pass $openpanel;
+        proxy_http_version 1.1;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+
+        # Telemetry must never hold a page open; the visitor's browser has already
+        # moved on.
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 5s;
+        access_log off;
+    }
+
     # The OpenAPI docs, served by Litestar.
     location /schema {
         proxy_pass http://api:8000;
@@ -78,20 +141,65 @@ server {
         proxy_set_header X-Forwarded-Proto $forwarded_proto;
     }
 
-    # Asked for by browsers on their own. Without this it falls through to the SPA
-    # fallback below and answers HTML with a 200, where an icon is expected.
+    # Asked for by browsers on their own. The site declares an SVG icon, so without
+    # this the request falls through to the page handler and answers HTML with a 200
+    # where an icon is expected.
     location = /favicon.ico {
-        try_files $uri =404;
+        return 204;
         access_log off;
     }
 
-    # SPA routing: every other URL returns the app, which routes client-side.
-    # `no-cache` on this HTML, else a browser would keep the old hashed asset names
-    # and never see a deployment.
+    # The site used to be four pages, and those URLs are in search results, in the
+    # LinkedIn profile and in anyone's bookmarks. Each of them is now a section of the
+    # single page, so they redirect to their anchor rather than 404.
+    #
+    # Quoted because nginx starts a comment at an unquoted `#`, which would turn the
+    # target into a bare `/` and silently send every one of these to the top of the
+    # page. 301 rather than 302: this is permanent, and a crawler should replace the
+    # old URL in its index rather than keep checking it.
+    location ~ ^/(en/)?(about|projects|contact)/?$ {
+        return 301 "/$1#$2";
+    }
+
+    # Every route is a file on disk: / is index.html and /en/ is en/index.html. There
+    # is no SPA fallback because there is no SPA — a URL that matches nothing is a 404,
+    # and says so, instead of returning the homepage with a 200.
+    #
+    # `$uri/index.html` also catches /en without its trailing slash. That serves the
+    # page at a second URL, which the <link rel="canonical"> in every document resolves
+    # for crawlers; every link the site generates uses the slash.
+    #
+    # `no-cache` on the HTML, else a browser would keep the old hashed asset names and
+    # never see a deployment.
+    # English lives under /en/ and French at the root, both as real files on disk.
+    # This block exists only to point error_page at the English 404 — otherwise an
+    # English visitor who mistypes a URL would land on a French error page.
+    location /en/ {
+        include /etc/nginx/security-headers.conf;
+
+        add_header Cache-Control "no-cache" always;
+        error_page 404 /en/404.html;
+        try_files $uri $uri/index.html =404;
+    }
+
     location / {
         include /etc/nginx/security-headers.conf;
 
-        try_files $uri /index.html;
         add_header Cache-Control "no-cache" always;
+        try_files $uri $uri/index.html =404;
+    }
+
+    error_page 404 /404.html;
+
+    # Internal so the prerendered 404 documents cannot be reached directly at
+    # /404.html with a 200.
+    location = /404.html {
+        include /etc/nginx/security-headers.conf;
+        internal;
+    }
+
+    location = /en/404.html {
+        include /etc/nginx/security-headers.conf;
+        internal;
     }
 }

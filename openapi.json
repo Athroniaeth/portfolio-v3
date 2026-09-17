@@ -1,16 +1,135 @@
 {
   "components": {
     "schemas": {
-      "Greeting": {
+      "Achievement": {
         "properties": {
-          "message": {
+          "description": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "kind": {
+            "enum": [
+              "experience",
+              "education",
+              "certification",
+              "distinction"
+            ],
+            "type": "string"
+          },
+          "period": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Period"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "url": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "description",
+          "kind",
+          "title"
+        ],
+        "title": "Achievement",
+        "type": "object"
+      },
+      "ContactMethod": {
+        "properties": {
+          "href": {
+            "type": "string"
+          },
+          "label": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "value": {
             "type": "string"
           }
         },
         "required": [
-          "message"
+          "href",
+          "label",
+          "value"
         ],
-        "title": "Greeting",
+        "title": "ContactMethod",
+        "type": "object"
+      },
+      "Content": {
+        "properties": {
+          "contact": {
+            "items": {
+              "$ref": "#/components/schemas/ContactMethod"
+            },
+            "type": "array"
+          },
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/LanguageSkill"
+            },
+            "type": "array"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/Profile"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            },
+            "type": "array"
+          },
+          "sections": {
+            "$ref": "#/components/schemas/Sections"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillGroup"
+            },
+            "type": "array"
+          },
+          "socials": {
+            "items": {
+              "$ref": "#/components/schemas/SocialLink"
+            },
+            "type": "array"
+          },
+          "testimonials": {
+            "items": {
+              "$ref": "#/components/schemas/Testimonial"
+            },
+            "type": "array"
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineEntry"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "contact",
+          "languages",
+          "profile",
+          "projects",
+          "sections",
+          "skills",
+          "socials",
+          "testimonials",
+          "timeline"
+        ],
+        "title": "Content",
         "type": "object"
       },
       "HealthCheck": {
@@ -23,6 +142,334 @@
         },
         "required": [],
         "title": "HealthCheck",
+        "type": "object"
+      },
+      "LanguageSkill": {
+        "properties": {
+          "level": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Text"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "LanguageSkill",
+        "type": "object"
+      },
+      "Period": {
+        "properties": {
+          "end": {
+            "oneOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start"
+        ],
+        "title": "Period",
+        "type": "object"
+      },
+      "Profile": {
+        "properties": {
+          "about": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "headline": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "location": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "about",
+          "headline",
+          "location",
+          "name",
+          "role",
+          "summary"
+        ],
+        "title": "Profile",
+        "type": "object"
+      },
+      "Project": {
+        "properties": {
+          "article": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Text"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "image": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
+          },
+          "repository": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stack": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "image",
+          "link",
+          "stack",
+          "title"
+        ],
+        "title": "Project",
+        "type": "object"
+      },
+      "SectionCopy": {
+        "properties": {
+          "heading": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "paragraph": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "subheading": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "heading",
+          "paragraph",
+          "subheading"
+        ],
+        "title": "SectionCopy",
+        "type": "object"
+      },
+      "Sections": {
+        "properties": {
+          "about": {
+            "$ref": "#/components/schemas/SectionCopy"
+          },
+          "contact": {
+            "$ref": "#/components/schemas/SectionCopy"
+          },
+          "projects": {
+            "$ref": "#/components/schemas/SectionCopy"
+          },
+          "skills": {
+            "$ref": "#/components/schemas/SectionCopy"
+          },
+          "testimonial": {
+            "$ref": "#/components/schemas/SectionCopy"
+          },
+          "timeline": {
+            "$ref": "#/components/schemas/SectionCopy"
+          }
+        },
+        "required": [
+          "about",
+          "contact",
+          "projects",
+          "skills",
+          "testimonial",
+          "timeline"
+        ],
+        "title": "Sections",
+        "type": "object"
+      },
+      "SkillGroup": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Text"
+            },
+            "type": "array"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "items",
+          "name"
+        ],
+        "title": "SkillGroup",
+        "type": "object"
+      },
+      "SocialLink": {
+        "properties": {
+          "href": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "href",
+          "icon",
+          "platform"
+        ],
+        "title": "SocialLink",
+        "type": "object"
+      },
+      "Testimonial": {
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "company": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "review",
+              "recommendation"
+            ],
+            "type": "string"
+          },
+          "published": {
+            "format": "date",
+            "type": "string"
+          },
+          "quote": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "rating": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "default": "Malt",
+            "type": "string"
+          },
+          "source_url": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "author",
+          "kind",
+          "published",
+          "quote"
+        ],
+        "title": "Testimonial",
+        "type": "object"
+      },
+      "Text": {
+        "properties": {
+          "en": {
+            "type": "string"
+          },
+          "fr": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "en",
+          "fr"
+        ],
+        "title": "Text",
+        "type": "object"
+      },
+      "TimelineEntry": {
+        "properties": {
+          "achievements": {
+            "items": {
+              "$ref": "#/components/schemas/Achievement"
+            },
+            "type": "array"
+          },
+          "year": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "achievements",
+          "year"
+        ],
+        "title": "TimelineEntry",
         "type": "object"
       }
     },
@@ -41,6 +488,39 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/content": {
+      "get": {
+        "deprecated": false,
+        "operationId": "ApiContentContent",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Content"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {
+              "cache-control": {
+                "deprecated": false,
+                "required": false,
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKey": []
+          }
+        ],
+        "summary": "Content"
+      }
+    },
     "/api/health": {
       "get": {
         "deprecated": false,
@@ -59,31 +539,6 @@
           }
         },
         "summary": "HealthCheck"
-      }
-    },
-    "/api/hello": {
-      "get": {
-        "deprecated": false,
-        "operationId": "ApiHelloHello",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Greeting"
-                }
-              }
-            },
-            "description": "Request fulfilled, document follows",
-            "headers": {}
-          }
-        },
-        "security": [
-          {
-            "APIKey": []
-          }
-        ],
-        "summary": "Hello"
       }
     }
   },

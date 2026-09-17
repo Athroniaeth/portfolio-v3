@@ -25,6 +25,6 @@ export default ts.config(
     },
   },
   {
-    ignores: ["src/generated/", "public/", "dist/"],
+    ignores: ["src/generated/", "public/", "dist/", ".ssr/"],
   },
 );

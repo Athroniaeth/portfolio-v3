@@ -14,6 +14,15 @@
 # and read the API key section of the README first.
 #
 # Coolify treats this file as the source of truth: declare things here, not in the UI.
+#
+# One thing to get right before the first deploy: the domain. The site's canonical
+# URLs, its og:url, its hreflang set and its sitemap are all built from the host in
+# frontend/src/lib/site-url.ts, which is baked into the HTML at build time and is
+# https://pierrechaumont.fr. Deploying this under any other domain still works, but
+# every page will point search engines at the other one, and analytics will stay
+# silent, since client.ts only initialises OpenPanel on that exact hostname and the
+# instance checks the Origin of every event against the project's allowed domains.
+# Change the host there, not here, if the site ever moves.
 
 services:
   web:
@@ -26,6 +35,9 @@ services:
       # `:?` makes it a required variable in the UI — a blank value blocks the
       # deployment instead of shipping an API with an empty key to compare against.
       - API_KEY=${API_KEY:?}
+      # Ingestion endpoint of the self-hosted OpenPanel instance, which nginx proxies
+      # /op/ to. Defaulted, not required: losing analytics must not block a deploy.
+      - OPENPANEL_API_URL=${OPENPANEL_API_URL:-https://opapi.athroniaeth.cloud}
     depends_on:
       api:
         condition: service_healthy
