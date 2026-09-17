@@ -68,7 +68,9 @@ structlog_config = StructlogConfig(middleware_logging_config=middleware_logging_
 structlog_plugin = StructlogPlugin(config=structlog_config)
 
 # `static="auto"` would have nothing left to consume: the API serves no files.
-# Worker count comes from WEB_CONCURRENCY, read natively by the Granian CLI.
+# GranianPlugin is what `litestar run` serves through. The worker count is the CLI's
+# own --web-concurrency option, which reads WEB_CONCURRENCY from the environment and
+# caps it at cpu_count() + 1.
 plugins = [
     structlog_plugin,
     VitePlugin(config=config),

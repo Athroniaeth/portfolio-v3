@@ -48,7 +48,12 @@ services:
       context: .
       dockerfile: Dockerfile.api
     environment:
-      # Vertical scaling knob: one Granian worker per core is a sane start.
+      # Number of HTTP worker processes, read by the Litestar CLI and capped at
+      # cpu_count() + 1. One is not a placeholder: the site bakes its content into the
+      # HTML at build time, so a page view never touches this API at all, and the only
+      # standing traffic is the healthcheck every ten seconds. A second worker would
+      # be a second Python interpreter held in memory for nothing. It would also
+      # double the rate limit, whose counter is per worker and in memory.
       - WEB_CONCURRENCY=${WEB_CONCURRENCY:-1}
       # Docs off by default here: /schema publishes a full route inventory, and the
       # API has its own public domain on Coolify, so nginx cannot hide them. Set

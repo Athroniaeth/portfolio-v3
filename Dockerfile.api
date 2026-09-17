@@ -30,6 +30,7 @@ USER app
 WORKDIR /app
 EXPOSE 8000
 
-# GranianPlugin backs `litestar run`. Worker count comes from WEB_CONCURRENCY, read
-# natively by the Granian CLI: that is the vertical scaling knob.
+# GranianPlugin backs `litestar run`. The worker count is the CLI's own
+# --web-concurrency option, which reads WEB_CONCURRENCY from the environment: that is
+# the vertical scaling knob. One is plenty here — see compose.prod.yml.
 CMD ["litestar", "run", "--host", "0.0.0.0", "--port", "8000"]
