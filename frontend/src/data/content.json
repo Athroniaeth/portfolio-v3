@@ -44,7 +44,7 @@
         "en": "A Python library that keeps personal data out of a language model without breaking the application around it. PII is detected (regex, NER or another LLM) and replaced with stable placeholders, so that john.doe@example.com becomes <<EMAIL:1>>. The model only ever works on de-identified text, and the real values are restored in the response, so the end user never sees the de-identification. A tool called by the agent receives the real value, while the LLM deciding to call it still sees only the placeholder. Around the library sit an inference API, a hub, a demo application and a design system."
       },
       "image": "piighost",
-      "link": "https://piighost.athroniaeth.cloud/",
+      "link": "https://piighost.dev/",
       "stack": [
         "Python",
         "NLP",

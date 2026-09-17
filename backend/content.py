@@ -335,7 +335,7 @@ PROJECTS = [
         # The product site, not the repository. `repository` below is rendered as a
         # separate "Code" link, so the card's headline destination can be the page that
         # explains what the thing does rather than a README.
-        link="https://piighost.athroniaeth.cloud/",
+        link="https://piighost.dev/",
         repository="https://github.com/Athroniaeth/piighost",
         stack=["Python", "NLP", "Privacy", "LLM"],
     ),
