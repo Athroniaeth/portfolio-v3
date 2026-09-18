@@ -10,9 +10,25 @@ import { render } from "svelte/server";
 
 import Page from "./Page.svelte";
 import { DEFAULT_LOCALE, LOCALES, type Locale } from "./lib/i18n";
-import { alternates, notFoundMeta, routes, siteName } from "./lib/site";
+import {
+  alternates,
+  navigation,
+  notFoundMeta,
+  routes,
+  siteName,
+  SECTION_IDS,
+} from "./lib/site";
 
-export { routes, siteName, alternates, notFoundMeta, LOCALES, DEFAULT_LOCALE };
+export {
+  routes,
+  siteName,
+  alternates,
+  notFoundMeta,
+  navigation,
+  SECTION_IDS,
+  LOCALES,
+  DEFAULT_LOCALE,
+};
 export { SITE_URL, OG_IMAGE, localePrefix } from "./lib/site";
 
 export interface RenderedPage {

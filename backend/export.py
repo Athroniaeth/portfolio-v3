@@ -8,23 +8,33 @@ cannot reach production.
 Run with `just content`.
 """
 
+from pathlib import Path
+
 import msgspec
 
 from backend import CONTENT_EXPORT, PROJECT_ROOT
 from backend.content import CONTENT
 
 
-def export_content() -> None:
+def export_content(destination: Path = CONTENT_EXPORT) -> None:
     """Write CONTENT to frontend/src/data/content.json.
 
     Indented and newline-terminated on purpose: the file is committed, so a diff has
     to be readable. The bytes never reach a browser — the prerenderer inlines the
     values it needs into the HTML — so there is nothing to gain by minifying it.
+
+    Args:
+        destination: Where to write. Overridden by the test that checks the exporter
+            round-trips, which must not rewrite the committed file as a side effect of
+            `just test`.
     """
-    CONTENT_EXPORT.parent.mkdir(parents=True, exist_ok=True)
+    destination.parent.mkdir(parents=True, exist_ok=True)
     payload = msgspec.json.format(msgspec.json.encode(CONTENT), indent=2)
-    CONTENT_EXPORT.write_bytes(payload + b"\n")
-    print(f"wrote {CONTENT_EXPORT.relative_to(PROJECT_ROOT)}")
+    destination.write_bytes(payload + b"\n")
+    try:
+        print(f"wrote {destination.relative_to(PROJECT_ROOT)}")
+    except ValueError:
+        print(f"wrote {destination}")
 
 
 if __name__ == "__main__":

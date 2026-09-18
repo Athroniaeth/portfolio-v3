@@ -259,8 +259,8 @@ PROFILE = Profile(
     about=Text(
         fr=(
             "AI Engineer spécialisé en software engineering, basé à Bordeaux, je "
-            "conçois et déploie des solutions locales, via l'open source et l'auto- "
-            "hébergé, alliant robustesse technique et utilité métier. Mon parcours m'a "
+            "conçois et déploie des solutions locales, via l'open source et "
+            "l'auto-hébergé, alliant robustesse technique et utilité métier. Mon parcours m'a "
             "conduit à créer des API d'extraction documentaire, des chatbots connectés "
             "à la documentation interne (RAG), des agents outillés et des pipelines de "
             "traitement de données à grande échelle, tout en contribuant à la mise en "

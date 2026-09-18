@@ -14,7 +14,7 @@ shadcn/ui) sur le squelette Litestar + Svelte de ce dépôt. Même design, même
 |---|---:|---:|---:|
 | poids de la page d'accueil | 1 334 Ko | **82 Ko** | −94 % |
 | requêtes | 42 | **12** | −71 % |
-| polices | 1 011 Ko | **44 Ko** | −96 % |
+| polices | 1 011 Ko | **25 Ko** | −98 % |
 | JavaScript | 215 Ko | **4,3 Ko** | −98 % |
 | First Contentful Paint | 276 ms | **128 ms** | −54 % |
 | langues | 1 | **2** | |
@@ -116,7 +116,7 @@ Les tâches courantes passent par `just` ; `just` seul liste les recettes.
 | `just dev-front` | le frontend seul, avec HMR |
 | `just types` | exporte `openapi.json` et régénère le client TypeScript |
 | `just content` | exporte `backend/content.py` vers `content.json` |
-| `just fonts` | sous-ensemble la police (1 008 Ko → 44 Ko) |
+| `just fonts` | sous-ensemble la police aux glyphes de la page (1 008 Ko → 25 Ko) |
 | `just images` | réencode les images en AVIF + WebP aux tailles peintes |
 | `just assets` | les deux précédentes |
 | `just preview` | build puis sert `frontend/dist` comme le fera nginx |
@@ -232,22 +232,28 @@ qui durait depuis vingt mois : le chiffre avait été tapé une fois, puis oubli
 L'objectif de ce portage était de servir le même site en consommant beaucoup moins.
 Voici où sont passés les 1 259 Ko économisés, par ordre de rendement.
 
-### Les polices : 1 011 Ko → 44 Ko
+### Les polices : 1 011 Ko → 25 Ko
 
 C'était, de loin, le premier poste. Le site servait `InterVariable.woff2` (344 Ko),
 son italique (379 Ko) et six fichiers IBM Plex Mono (285 Ko) — à chaque visite à froid,
 sans aucun sous-ensemble : chaque visiteur téléchargeait aussi le cyrillique, le grec
-et le vietnamien. Trois coupes (`scripts/optimize_fonts.py`) :
+et le vietnamien. Quatre coupes (`scripts/optimize_fonts.py`) :
 
-- **latin seul** au lieu de latin + latin-ext : 158 Ko → 67 Ko. Le texte est anglais
-  avec des noms propres français, dont tous les accents tiennent dans `U+00C0-00FF`.
-  Le `@font-face` déclare l'`unicode-range` correspondante, donc un caractère hors
-  sous-ensemble retombe sur une police système au lieu d'afficher un carré.
+- **latin seul** au lieu de latin + latin-ext : 158 Ko → 67 Ko.
 - **axe optique figé** : 67 Ko → 44 Ko. L'axe `opsz` portait un second jeu de deltas
   `gvar` pour environ la moitié du fichier. Figé à sa valeur par défaut, les titres
   s'affichent comme de l'Inter 14 pt agrandi — ce que fait n'importe quel déploiement
   d'Inter statique. C'est le seul arbitrage de ce portage qui touche au rendu, et il
   se rouvre en une ligne (`PINNED_AXES`).
+- **les seuls glyphes de la page** : 44 Ko → 25 Ko. Les quatre documents construits
+  contiennent 110 caractères distincts ; le fichier ne porte que ceux-là. Ce choix
+  avait d'abord été rejeté par crainte du carré blanc, et c'était une erreur de
+  raisonnement : le script génère l'`unicode-range` **depuis le même jeu de
+  caractères** que le sous-ensemble, donc un caractère que le fichier ne porte pas est
+  aussi un caractère qu'il ne revendique pas, et le navigateur retombe sur la police
+  système. Le pire cas est un mot dans une autre sans-serif, pas une rangée de carrés.
+  Et `just check` construit puis échoue si les documents contiennent un caractère
+  absent du fichier, donc ça se voit avant d'être publié.
 - **italique et monospace supprimées** : rien n'est en italique sur le site, et la
   police mono ne servait qu'aux blocs de code du blog, non porté.
 
@@ -318,11 +324,14 @@ stable, `no-cache` pour le HTML afin qu'un déploiement soit vu immédiatement.
 
 ### Ce qui n'a pas été fait
 
-- **Sous-ensembler la police aux seuls glyphes utilisés** descendrait sous 20 Ko, mais
-  rendrait chaque modification de texte dépendante d'un réencodage : un mot avec une
-  lettre inédite afficherait un carré. Les ~25 Ko en jeu ne valent pas ce piège.
-- **Brotli** ferait mieux que gzip, mais le module n'est pas dans l'image nginx
-  officielle. `gzip_static` est le meilleur rapport sans image sur mesure.
+- **Brotli** ferait gagner environ 4 Ko sur une première visite, mais le module n'est
+  pas dans l'image nginx officielle, et le servir à la main sans lui est une mauvaise
+  affaire ici. Il faudrait une `location` par extension pour forcer le `Content-Type`,
+  que `try_files` prendrait sinon sur le `.br` — et avec `nosniff` actif, un type
+  erroné ne dégrade pas, il fait refuser le fichier par le navigateur. Quarante lignes
+  de conf fragile qui peuvent blanchir la page, contre 4 Ko. Si on veut Brotli, la
+  façon honnête est de construire une image nginx avec `ngx_brotli`, ce qui déplace le
+  coût vers le build et la maintenance plutôt que vers le risque.
 - **Inliner le CSS** supprimerait la seule requête bloquante de la première visite.
   Depuis le passage en page unique, l'arbitrage s'est resserré : il n'y a plus de
   seconde page sur laquelle réenvoyer la feuille. Mais le HTML est servi en

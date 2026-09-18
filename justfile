@@ -112,5 +112,10 @@ check-types: types
 check-content: content
     git diff --exit-code frontend/src/data/content.json
 
-# Full gate before pushing (what CI runs): contracts + lint + tests.
-check: check-types check-content lint test
+# Full gate before pushing (what CI runs): contracts + lint + build + tests.
+#
+# `build` is in the middle on purpose. It is the only thing that exercises the
+# prerenderer, the document shell and every Svelte component — none of which the Python
+# tests can reach — and it is where the build-time assertions live. It also has to run
+# before `test`, because two of the tests read the built documents.
+check: check-types check-content lint build test

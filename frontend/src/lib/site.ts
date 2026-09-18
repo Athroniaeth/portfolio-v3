@@ -29,10 +29,22 @@ export const OG_IMAGE = "/images/opengraph.jpg";
 /**
  * A section of the page, which is also its anchor and a key into `content.sections`.
  *
- * Typed off the content struct rather than written out again, so adding a section in
- * backend/content.py is a compile error here until it is placed.
+ * This used to claim that adding a section in backend/content.py was a compile error
+ * here until it was placed. It was not: `keyof` resolves against the hand-written
+ * `Sections` interface in lib/content.ts, not against the JSON, so a section could be
+ * added, exported, pass every test, and render nowhere. TypeScript cannot see the
+ * difference, so the check moved to where it can be made — the prerenderer asserts
+ * that every id below is an anchor in the finished document. See scripts/prerender.mjs.
  */
 export type SectionId = keyof typeof content.sections;
+
+/**
+ * Every section the content declares, in the order Home.svelte renders them.
+ *
+ * Read from the exported JSON rather than written out, so the build has something to
+ * check the document against.
+ */
+export const SECTION_IDS = Object.keys(content.sections) as SectionId[];
 
 /**
  * What the header links to, in order.

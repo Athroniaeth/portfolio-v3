@@ -25,13 +25,25 @@ export interface ContactView {
 export function contactMethods(locale: Locale): ContactView[] {
   return content.contact.map((method) => {
     const social = content.socials.find((item) => item.href === method.href);
+    // Loud rather than silent. The previous fallback drew an arrow, so changing a
+    // Malt URL in one of the two lists and not the other degraded the button into
+    // something that still looked deliberate.
+    let icon: IconName;
+    if (method.href.startsWith("mailto:")) {
+      icon = "mail";
+    } else if (social) {
+      icon = social.icon as IconName;
+    } else {
+      throw new Error(
+        `no social entry matches the contact href ${method.href} — the two lists in backend/content.py have drifted`,
+      );
+    }
+
     return {
       label: t(method.label, locale),
       value: method.value,
       href: method.href,
-      icon: (method.href.startsWith("mailto:")
-        ? "mail"
-        : (social?.icon ?? "arrowUpRight")) as IconName,
+      icon,
       primary: method.href.startsWith("mailto:"),
       external: method.href.startsWith("http"),
     };

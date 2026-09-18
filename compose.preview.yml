@@ -29,9 +29,7 @@ services:
     environment:
       - API_KEY=${API_KEY:?}
       - OPENPANEL_API_URL=${OPENPANEL_API_URL:-https://opapi.athroniaeth.cloud}
-    depends_on:
-      api:
-        condition: service_healthy
+    # See compose.prod.yml: the static site does not wait for the API.
     restart: unless-stopped
     networks:
       # `coolify` is where Traefik listens; `default` is what lets nginx reach `api`.

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./font.css";
 
 /* Auto-detection already walks src/, but the client entry imports no component — the
    markup is rendered by the SSR build — so nothing here links this stylesheet to the
@@ -12,21 +13,11 @@
    every dark: utility below a straight port. */
 @custom-variant dark (&:is(.dark *));
 
-/* One file, one family. See scripts/optimize_fonts.py for how 1 008 KB of woff2
-   became 44 KB — and why `unicode-range` is not optional: it is what makes a
-   character outside the Latin cut fall back to a system font instead of rendering
-   as tofu. `swap` shows the fallback immediately rather than blocking on the font. */
-@font-face {
-  font-family: "Inter";
-  src: url("/fonts/inter-latin.woff2") format("woff2-variations");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
-    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193,
-    U+2212, U+2215, U+FEFF, U+FFFD;
-}
+/* The @font-face lives in font.css, which scripts/optimize_fonts.py generates. Its
+   `unicode-range` has to be the exact character set the woff2 was subset to, and the
+   only way to guarantee that is to write both from the same list. See the module
+   docstring there for how 1 008 KB of woff2 became 25 KB, and why cutting this far is
+   safe rather than a tofu generator. */
 
 @theme inline {
   /* The system stack is a real fallback, not a formality: it is what renders during
@@ -58,16 +49,23 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Ported verbatim from the shadcn/ui tokens the Next.js site used, minus the chart
-   and sidebar ramps it never rendered. Same oklch values, so the two sites are the
-   same colour. */
+/* Ported from the shadcn/ui tokens the Next.js site used, minus the chart and sidebar
+   ramps it never rendered, and with two values raised.
+
+   `--primary` was 3.63:1 on white and `--ring` 2.60:1, so every section heading and
+   every "Vérifier" link failed WCAG 1.4.3, and the focus indicator failed 1.4.11 — on
+   controls that also set `outline-none`, which means the browser's own compliant ring
+   was being replaced by one that was not. Both are now the smallest lightness change
+   that clears the threshold, so the blue is the same blue, one step deeper. The dark
+   theme already passed both and is untouched. */
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.13 0.028 261.692);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.13 0.028 261.692);
-  --primary: oklch(0.622 0.154 254.173);
+  /* 4.59:1 on the background, was 3.63:1. */
+  --primary: oklch(0.565 0.154 254.173);
   --primary-foreground: oklch(0.984 0.014 180.72);
   --secondary: oklch(0.967 0.003 264.542);
   --secondary-foreground: oklch(0.21 0.034 264.665);
@@ -77,7 +75,8 @@
   --accent-foreground: oklch(0.21 0.034 264.665);
   --border: oklch(0.928 0.006 264.531);
   --input: oklch(0.928 0.006 264.531);
-  --ring: oklch(0.707 0.022 261.325);
+  /* 3.11:1 on the background, was 2.60:1. */
+  --ring: oklch(0.66 0.022 261.325);
 }
 
 .dark {
@@ -96,6 +95,29 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.551 0.027 264.364);
+}
+
+/* For visitors who asked their operating system for more contrast, and almost never
+   get it on a personal site. Everything the site draws reads from these four tokens,
+   so honouring the query costs eight lines here and nothing at all for everyone else.
+
+   `--border` is the one value deliberately left low in the default theme: at 1.24:1 it
+   is a hairline between rows, decoration rather than a control boundary. Here it
+   becomes visible. */
+@media (prefers-contrast: more) {
+  :root {
+    --primary: oklch(0.48 0.16 254.173);
+    --muted-foreground: oklch(0.42 0.027 264.364);
+    --border: oklch(0.64 0.012 264.531);
+    --ring: oklch(0.5 0.03 261.325);
+  }
+
+  .dark {
+    --primary: oklch(0.86 0.1 249.535);
+    --muted-foreground: oklch(0.85 0.018 261.325);
+    --border: oklch(1 0 0 / 40%);
+    --ring: oklch(0.8 0.03 264.364);
+  }
 }
 
 @layer base {
@@ -121,6 +143,12 @@
    */
   html {
     font-size: 110%;
+    /* Clears the 4rem sticky header for *everything* the browser scrolls into view,
+       not just the sections. `scroll-margin-top` on each section handled an anchor
+       click and nothing else, so tabbing to a link below the fold parked it under the
+       header, where it is focused and invisible. One declaration on the scroller is
+       the whole fix. */
+    scroll-padding-top: 5rem;
     @apply antialiased motion-safe:scroll-smooth;
   }
 

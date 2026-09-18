@@ -83,8 +83,8 @@ export const messages = {
   rangeConnector: { fr: "à", en: "to" },
   notFoundTitle: { fr: "Page introuvable", en: "Page not found" },
   notFoundBody: {
-    fr: "Cette adresse ne correspond à rien sur ce site. Les quatre pages de l'en-tête en font le tour.",
-    en: "That URL does not match anything on this site. The four pages in the header are the whole of it.",
+    fr: "Cette adresse ne correspond à rien sur ce site. Tout tient sur une seule page, et les liens de l'en-tête y mènent.",
+    en: "That URL does not match anything on this site. All of it fits on one page, and the links in the header lead to it.",
   },
 } as const satisfies Record<string, Text>;
 

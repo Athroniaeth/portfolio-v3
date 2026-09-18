@@ -20,9 +20,13 @@
  *
  * It also emits robots.txt, a bilingual sitemap, a 404 document per language, and the
  * CSP hash of the inline theme script — see writeCspHash.
+ *
+ * And it checks its own output — see assertDocument. That is where the guarantees
+ * that types cannot express are actually enforced.
  */
 
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -137,6 +141,87 @@ async function writeCrawlerFiles(routes, alternatesFor, siteUrl) {
   );
 }
 
+// Em dash and en dash as separators, and a colon introducing a clause. The same house
+// rule tests/test_api.py enforces on content.py, applied here to the finished text
+// instead — which is the only place that also covers the interface strings in
+// lib/i18n.ts and anything written directly into a component.
+const FORBIDDEN_PUNCTUATION = [
+  ["\u2014", "em dash"],
+  ["\u2013", "en dash"],
+  [" : ", "spaced colon"],
+];
+
+/**
+ * Check a finished document against the promises the source cannot keep on its own.
+ *
+ * Three of these exist because TypeScript looked like it was checking them and was
+ * not. `SectionId` is `keyof` a hand-written interface, so a section added in
+ * backend/content.py and exported to JSON type-checks, tests clean, and renders
+ * nowhere at all. The build is the first place that can tell, because it is the first
+ * place holding the actual page.
+ *
+ * @param {string} html A complete document.
+ * @param {object} context Section ids, nav links and the paths that must resolve.
+ * @param {string} label What to name in the error.
+ */
+function assertDocument(html, context, label) {
+  const problems = [];
+
+  const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+
+  // A section declared in the content but never placed on the page.
+  for (const id of context.sectionIds) {
+    if (!ids.has(id)) {
+      problems.push(
+        `section "${id}" is in content.sections but has no element on the page`,
+      );
+    }
+  }
+
+  // A nav link pointing at an anchor that does not exist is a link that does nothing.
+  for (const link of context.navLinks) {
+    const anchor = link.href.replace(/^#/, "");
+    if (!ids.has(anchor)) {
+      problems.push(`the nav links to #${anchor}, which no element carries`);
+    }
+  }
+
+  // Text between tags only: an https:// in an href is not prose.
+  const text = [...html.matchAll(/>([^<]+)</g)].map((m) => m[1]).join(" ");
+  for (const [token, name] of FORBIDDEN_PUNCTUATION) {
+    const at = text.indexOf(token);
+    if (at !== -1) {
+      problems.push(
+        `${name} in the rendered text, near "${text.slice(Math.max(0, at - 40), at + 20).trim()}"`,
+      );
+    }
+  }
+
+  // Every image the markup names has to be a file that exists, in every variant the
+  // srcset offers. `just images` writing one width and not the other used to be
+  // invisible until a 2x screen asked for the missing one.
+  const referenced = new Set();
+  for (const match of html.matchAll(/(?:src|srcset)="([^"]+)"/g)) {
+    for (const candidate of match[1].split(",")) {
+      const path = candidate.trim().split(/\s+/)[0];
+      if (path.startsWith("/images/") || path.startsWith("/fonts/")) {
+        referenced.add(path);
+      }
+    }
+  }
+  for (const path of referenced) {
+    if (!existsSync(join(DIST, path))) {
+      problems.push(
+        `${path} is referenced but was never written — run \`just images\``,
+      );
+    }
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`${label}:\n  ${problems.join("\n  ")}`);
+  }
+}
+
 async function prerender() {
   const entry = await import(pathToFileURL(SSR_ENTRY).href);
   const {
@@ -145,6 +230,8 @@ async function prerender() {
     siteName,
     alternates,
     notFoundMeta,
+    navigation,
+    SECTION_IDS,
     localePrefix,
     LOCALES,
     DEFAULT_LOCALE,
@@ -171,6 +258,11 @@ async function prerender() {
       assets,
       site,
     );
+    assertDocument(
+      html,
+      { sectionIds: SECTION_IDS, navLinks: navigation(route.locale) },
+      `${route.file} is not the page it claims to be`,
+    );
     const target = join(DIST, route.file);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, html);
@@ -194,6 +286,10 @@ async function prerender() {
       assets,
       site,
     );
+    // The 404 carries the header, so its nav must resolve too — but to the page it
+    // links away to, not to itself, so only the punctuation and the assets are
+    // checked here.
+    assertDocument(html, { sectionIds: [], navLinks: [] }, `${locale} 404`);
     const file = prefix ? `${prefix}/404.html` : "404.html";
     const target = join(DIST, file);
     await mkdir(dirname(target), { recursive: true });

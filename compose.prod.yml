@@ -38,9 +38,10 @@ services:
       # Ingestion endpoint of the self-hosted OpenPanel instance, which nginx proxies
       # /op/ to. Defaulted, not required: losing analytics must not block a deploy.
       - OPENPANEL_API_URL=${OPENPANEL_API_URL:-https://opapi.athroniaeth.cloud}
-    depends_on:
-      api:
-        condition: service_healthy
+    # No `depends_on`. The site is static files and never calls the API, so waiting
+    # for a Python healthcheck only meant that a bad API_KEY took the whole site down.
+    # nginx resolves `api` per request now (see deploy/default.conf.template), so it
+    # starts and serves every page whether or not the API is up.
     restart: unless-stopped
 
   api:

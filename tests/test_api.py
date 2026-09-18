@@ -6,6 +6,7 @@ import subprocess
 
 import msgspec
 import pytest
+from fontTools.ttLib import TTFont
 from litestar import Litestar, get
 from litestar.exceptions import ImproperlyConfiguredException
 from litestar.openapi.spec import Components
@@ -189,16 +190,22 @@ async def test_rate_limit_is_wired_into_the_app(client: AsyncTestClient, api_key
 
 
 def test_exported_content_matches_the_source(tmp_path: pathlib.Path):
+    # Written to tmp_path, not to CONTENT_EXPORT. This test used to take the fixture
+    # and ignore it, so `just test` rewrote a tracked file as a side effect.
     """The JSON the frontend builds from must be the JSON content.py produces.
 
     `just check-content` enforces this on the committed file; this covers the exporter
     itself, so a change to the structs that breaks serialisation fails here rather than
     in a Docker build with no Python in it.
     """
-    export_content()
-    assert CONTENT_EXPORT.exists()
-    exported = msgspec.json.decode(CONTENT_EXPORT.read_bytes(), type=Content)
+    destination = tmp_path / "content.json"
+    export_content(destination)
+    exported = msgspec.json.decode(destination.read_bytes(), type=Content)
     assert exported == CONTENT
+
+    # And the committed artefact is the same bytes, which is what the frontend builds
+    # from and what `just check-content` guards.
+    assert CONTENT_EXPORT.read_bytes() == destination.read_bytes()
 
 
 def test_every_project_image_has_its_encoded_variants():
@@ -408,3 +415,34 @@ def test_no_source_file_is_hidden_from_git():
         if not path.startswith(IGNORED_ON_PURPOSE) and "__pycache__" not in path
     ]
     assert not hidden, "excluded from git by .gitignore: " + ", ".join(hidden)
+
+
+def test_the_font_carries_every_character_the_site_renders():
+    """The subset is cut to the glyphs on the page, so the page has to stay inside it.
+
+    Cutting this far is only safe because `unicode-range` declares exactly what the
+    file holds, which makes an unlisted character fall back to the system stack rather
+    than render as tofu. That is a graceful failure, not a free one: a French quote
+    mark or an em dash added to the copy would silently come out in a different
+    typeface. This is what makes it visible instead, and it names the fix.
+
+    `just check` builds before it tests, so the documents are there. A bare `pytest` on
+    a fresh checkout has nothing to read and skips.
+    """
+    documents = sorted((FRONTEND_ROOT / "dist").rglob("*.html"))
+    if not documents:
+        pytest.skip("no build to check — run `just build`")
+
+    font = TTFont(FRONTEND_ROOT / "public" / "fonts" / "inter-latin.woff2")
+    covered = set(font.getBestCmap() or {})
+
+    missing = {
+        character
+        for document in documents
+        for character in document.read_text("utf-8")
+        if ord(character) >= 0x20 and ord(character) not in covered
+    }
+    assert not missing, (
+        "the built pages use characters the font was not subset to, so they will "
+        f"render in the fallback typeface: {sorted(missing)}. Run `just fonts`."
+    )

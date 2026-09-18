@@ -26,10 +26,30 @@ map $http_x_forwarded_for $forwarded_for {
 # Which image format this client takes. Every browser that supports AVIF advertises
 # it in Accept on image requests; the ones that do not simply get no suffix here and
 # fall through to the WebP.
+#
+# The lookahead is the whole point. A bare "~image/avif" is a substring match, so
+# `Accept: image/avif;q=0` — which is a client saying explicitly that it does *not*
+# want AVIF — would have been served one.
 map $http_accept $avif_suffix {
-    default       "";
-    "~image/avif" ".avif";
+    default                                          "";
+    "~image/avif(?!\s*;\s*q=0(\.0+)?\s*(,|$))"       ".avif";
 }
+
+# HSTS only over HTTPS, which is what the RFC asks and what keeps a plain-HTTP
+# development run from poisoning a browser for a year. nginx skips an add_header whose
+# value is empty, so the default branch simply emits nothing.
+#
+# No `preload`: that one is a one-way door, submitted to a list browsers ship, and it
+# is not this site's to spend on every future subdomain.
+map $forwarded_proto $hsts_header {
+    default "";
+    https   "max-age=31536000; includeSubDomains";
+}
+
+# The analytics endpoint is the only thing on this origin that forwards a body to a
+# third party, so it gets its own budget. One page view is one event; sixty a minute
+# is far above any honest visitor and far below what makes a useful flood.
+limit_req_zone $binary_remote_addr zone=analytics:1m rate=60r/m;
 
 server {
     # 8080 rather than 80: the base image runs unprivileged.
@@ -111,12 +131,21 @@ server {
     }
 
     location /api/ {
+        include /etc/nginx/security-headers.conf;
+
         # The API key is added here, server-side, so it never reaches the browser:
         # the bundle holds no secret. proxy_set_header also overwrites any header a
         # client sent, so this value is the only one the API ever sees from us.
         proxy_set_header X-API-Key "${API_KEY}";
 
-        proxy_pass http://api:8000;
+        # Resolved per request, through a variable, rather than once at startup. With
+        # a literal upstream nginx refuses to start at all when `api` does not resolve
+        # yet, which made a site of static files unable to serve a byte because a
+        # Python process it never calls was not up. Now it starts, serves every page,
+        # and answers 502 here alone until the API arrives.
+        resolver 127.0.0.11 valid=30s ipv6=off;
+        set $api "http://api:8000";
+        proxy_pass $api;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -124,12 +153,18 @@ server {
         proxy_set_header X-Forwarded-Proto $forwarded_proto;
     }
 
-    # Analytics, proxied first-party.
+    # Analytics, proxied first-party, on exactly one path.
     #
     # The page calls /op/track on its own origin and this block forwards it to the
     # OpenPanel instance, so the browser never opens a second connection: no extra DNS
     # lookup, TCP handshake or TLS negotiation for a few hundred bytes of telemetry,
-    # and the CSP below needs no third-party origin.
+    # and the CSP needs no third-party origin.
+    #
+    # `location = /op/track` rather than a `/op/` prefix, and POST only. The prefix
+    # form forwarded any path and any method, with the default one megabyte body, to
+    # a service that is not ours to expose — an open relay into the analytics instance
+    # with this host's address in front of it. The vendored op1.js calls exactly one
+    # endpoint, so exactly one is what is open.
     #
     # `rewrite` strips the prefix, not a trailing slash on proxy_pass. The usual
     # `proxy_pass https://host/;` idiom does not apply once the upstream is a variable:
@@ -140,7 +175,17 @@ server {
     # Origin and User-Agent are passed through untouched on purpose. The instance
     # checks Origin against the project's allowed domains — rewriting it would make
     # every event 401 — and reads User-Agent for device attribution.
-    location /op/ {
+    location = /op/track {
+        include /etc/nginx/security-headers.conf;
+
+        limit_except POST {
+            deny all;
+        }
+        # A page view is one event of a few hundred bytes. Both numbers are far above
+        # any honest visitor and far below what makes a useful flood.
+        client_max_body_size 32k;
+        limit_req zone=analytics burst=10 nodelay;
+
         # The upstream is an external name, so it has to be resolved at request time.
         # Without a resolver nginx resolves it once at startup and keeps the address
         # forever, which breaks the day the instance moves.
@@ -163,11 +208,16 @@ server {
         access_log off;
     }
 
-    # The OpenAPI docs, served by Litestar.
+    # The OpenAPI docs, served by Litestar. Off by default in production.
     location /schema {
-        proxy_pass http://api:8000;
+        include /etc/nginx/security-headers.conf;
+
+        resolver 127.0.0.11 valid=30s ipv6=off;
+        set $schema_api "http://api:8000";
+        proxy_pass $schema_api;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $forwarded_for;
         proxy_set_header X-Forwarded-Proto $forwarded_proto;
     }

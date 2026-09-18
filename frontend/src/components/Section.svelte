@@ -10,9 +10,10 @@
    * The id comes from the content struct rather than being typed here, so a section
    * and the nav entry that points at it cannot end up with different names.
    *
-   * `scroll-mt-20` is not decoration: the header is sticky and 4rem tall, so without
-   * it the browser would park the heading of every section underneath the header.
-   * The extra rem is breathing room.
+   * Clearing the sticky header is `scroll-padding-top` on the scroller, in app.css,
+   * rather than a `scroll-mt` on each section here. Same result for an anchor click,
+   * and it also covers the case a per-section margin never did: tabbing to a link
+   * below the fold, which used to land focus underneath the header.
    *
    * The section *is* the container rather than wrapping one. Nothing here needs to
    * bleed to the edge of the viewport, so the outer element was a node per section
@@ -21,10 +22,7 @@
   let { id, children }: { id: SectionId; children: Snippet } = $props();
 </script>
 
-<section
-  {id}
-  class="container scroll-mt-20 space-y-12 py-20 md:space-y-16 md:py-32"
->
+<section {id} class="container space-y-12 py-20 md:space-y-16 md:py-32">
   <SectionIntro copy={content.sections[id]} />
   {@render children()}
 </section>
