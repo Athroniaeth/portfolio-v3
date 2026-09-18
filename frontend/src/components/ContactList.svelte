@@ -25,21 +25,20 @@
         href={method.href}
         rel={method.external ? "noopener noreferrer" : undefined}
         target={method.external ? "_blank" : undefined}
-        class="group bg-muted/40 hover:border-foreground/30 focus-visible:ring-ring inline-flex items-center gap-3 rounded-2xl border px-5 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        class="group bg-muted/40 hover:border-foreground/30 focus-visible:ring-ring inline-grid grid-cols-[auto_1fr] items-center gap-x-3 rounded-2xl border px-5 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
       >
+        <!-- A grid rather than nested flex boxes: the mark spans both rows, so the
+             label and the address need no wrapper element to be stacked. -->
         <Icon
           name={method.icon}
-          class="text-muted-foreground group-hover:text-foreground size-5 shrink-0 transition-colors"
+          class="text-muted-foreground group-hover:text-foreground row-span-2 size-5 shrink-0 transition-colors"
         />
-        <span>
-          <span
-            class="text-muted-foreground block text-[0.625rem] tracking-wide uppercase"
-          >
-            {method.label}
-          </span>
-          <span class="block text-sm font-medium break-all">{method.value}</span
-          >
+        <span
+          class="text-muted-foreground text-[0.625rem] tracking-wide uppercase"
+        >
+          {method.label}
         </span>
+        <span class="text-sm font-medium break-all">{method.value}</span>
       </a>
     </li>
   {/each}

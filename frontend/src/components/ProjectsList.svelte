@@ -26,11 +26,12 @@
             href={project.link}
             target="_blank"
             rel="noopener noreferrer"
-            class="flex max-w-max items-center pr-2.5 focus-visible:outline-none"
+            class="flex max-w-max items-center pr-2.5 after:absolute after:inset-0 after:z-10 after:content-[''] focus-visible:outline-none"
           >
-            <!-- Stretches the link over the whole card, so the hit area is the card
-                 rather than the title alone. -->
-            <span class="absolute inset-0 z-10"></span>
+            <!-- `after:absolute inset-0` stretches the link over the whole card, so
+                 the hit area is the card and not the title alone. It used to be an
+                 empty <span>, which is a node per card for something that draws
+                 nothing. -->
             {project.title}
             <Icon
               name="arrowUpRight"

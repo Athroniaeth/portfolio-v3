@@ -23,6 +23,14 @@ map $http_x_forwarded_for $forwarded_for {
     default $http_x_forwarded_for;
 }
 
+# Which image format this client takes. Every browser that supports AVIF advertises
+# it in Accept on image requests; the ones that do not simply get no suffix here and
+# fall through to the WebP.
+map $http_accept $avif_suffix {
+    default       "";
+    "~image/avif" ".avif";
+}
+
 server {
     # 8080 rather than 80: the base image runs unprivileged.
     listen 8080;
@@ -65,6 +73,29 @@ server {
         add_header Cache-Control "public, max-age=31536000, immutable" always;
         access_log off;
         try_files $uri =404;
+    }
+
+    # Pick the image format here rather than in the markup.
+    #
+    # The page used to ship a <picture> with one <source> per format, which is three
+    # elements per image and twenty-one across the page, all of them to answer a
+    # question the server can answer on its own. The markup now names the WebP, and
+    # this block hands over the AVIF when the browser says in Accept that it takes
+    # one. Same bytes on the wire, one element per image instead of three.
+    #
+    # `Vary: Accept` is not optional: without it a shared cache would be free to
+    # serve the AVIF it stored for one visitor to a browser that cannot decode it.
+    #
+    # The Content-Type follows the file try_files actually resolved, not the .webp in
+    # the request, because try_files rewrites the internal URI before the type is
+    # looked up.
+    location ~ ^/images/(?<image_path>.+)\.webp$ {
+        include /etc/nginx/security-headers.conf;
+
+        add_header Cache-Control "public, max-age=604800" always;
+        add_header Vary "Accept" always;
+        access_log off;
+        try_files /images/$image_path$avif_suffix /images/$image_path.webp =404;
     }
 
     # Fonts and images are not hashed — they are written by `just fonts` and

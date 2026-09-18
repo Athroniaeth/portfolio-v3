@@ -47,10 +47,8 @@
 
   <figcaption class="text-muted-foreground mt-5 text-sm">
     <span class="text-foreground font-medium">{testimonial.author}</span
-    >{byline.slice(testimonial.author.length)}
-    <span aria-hidden="true">·</span>
-    {formatDate(testimonial.published, locale)}
-    <span aria-hidden="true">·</span>
+    >{byline.slice(testimonial.author.length)} ·
+    {formatDate(testimonial.published, locale)} ·
     <!-- Linked only when the quote is actually readable at the other end. Malt shows
          that a recommendation exists but hides its text behind a login, so that one
          names its source without pretending to link to it. -->

@@ -18,12 +18,12 @@
 <ul class="space-y-10">
   {#each content.timeline as entry (entry.year)}
     <li class="reveal space-y-8">
-      <h3>
-        <span
-          class="border-primary/40 rounded-2xl border px-4 py-2 font-medium"
-        >
-          {entry.year}
-        </span>
+      <!-- `w-fit` so the heading hugs the year the way the inner span used to,
+           without being an element on its own. -->
+      <h3
+        class="border-primary/40 w-fit rounded-2xl border px-4 py-2 font-medium"
+      >
+        {entry.year}
       </h3>
       <ul class="space-y-6 pl-6">
         {#each entry.achievements as achievement (achievement.title.en)}
@@ -37,24 +37,30 @@
               class="stroke-primary h-[1lh] w-5 flex-none"
             />
             <div>
-              <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <h4 class="font-medium tracking-tight">
-                  {t(achievement.title, locale)}
-                </h4>
+              <!-- The kind sits inside the heading rather than in a flex row beside
+                   it. One element fewer per entry, and a screen reader reading the
+                   outline hears "Data Scientist chez Scalian, expérience", which is
+                   the distinction the chip exists to draw in the first place. -->
+              <h4
+                class="flex flex-wrap items-baseline gap-x-2 gap-y-1 font-medium tracking-tight"
+              >
+                {t(achievement.title, locale)}
                 <span
                   class="text-muted-foreground rounded-full border px-2 py-0.5 text-[0.625rem] tracking-wide uppercase"
                 >
                   {t(kind.label, locale)}
                 </span>
-              </div>
+              </h4>
 
               <!-- Dates and length are computed from the period in content.py rather
                    than written into the title, which is how the old site ended up
                    claiming a twenty-month job had lasted "1 year, 2 month". -->
               {#if achievement.period}
+                <!-- The dot is a text node, not an aria-hidden element. Screen
+                     readers do not announce punctuation at their default verbosity,
+                     so the element bought nothing and cost one node per entry. -->
                 <p class="text-muted-foreground mt-0.5 text-xs">
-                  {formatRange(achievement.period, locale)}
-                  <span aria-hidden="true">·</span>
+                  {formatRange(achievement.period, locale)} ·
                   {formatDuration(achievement.period, locale)}
                 </p>
               {/if}
